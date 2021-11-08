@@ -70,5 +70,4 @@ func main() {
 
 	// log and close
 	log.Print("Result: ", <-resultChan)
-	_ = chromedpproxy.CloseTarget(targetID)
 }

@@ -93,8 +93,9 @@ func CloseTarget(id target.ID) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	Context, _ = chromedp.NewContext(Context, chromedp.WithTargetID(id))
-	if err := chromedp.Run(Context, page.Close()); err != nil {
+	ctx, cancel := chromedp.NewContext(Context, chromedp.WithTargetID(id))
+	defer cancel()
+	if err := chromedp.Run(ctx, page.Close()); err != nil {
 		return err
 	}
 	return nil

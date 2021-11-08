@@ -22,7 +22,7 @@ Please proceed to the [examples directory](examples)
 ## Getting Started
 ### Installing
 ```shell
-go get -u github.com/jarylc/go-chromedpproxy
+go get github.com/jarylc/go-chromedpproxy
 ```
 ### Usage
 #### Basic
