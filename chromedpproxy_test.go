@@ -7,11 +7,26 @@ import (
 	"testing"
 )
 
-func TestChromeDPProxy(t *testing.T) {
-	// prepare proxy
+func TestClosingTwoTabsAndCreateOneTab(t *testing.T) {
 	PrepareProxy(":9222", ":9221")
+	target1ID, err := NewTab("about:blank")
+	if err != nil {
+		t.Error(err)
+	}
+	target2ID, err := NewTab("about:blank")
+	if err != nil {
+		t.Error(err)
+	}
+	err = CloseTarget(target1ID)
+	if err != nil {
+		t.Error(err)
+	}
+	err = CloseTarget(target2ID)
+	if err != nil {
+		t.Error(err)
+	}
 
-	// test creating proxy, then deleting, then creating again
+	PrepareProxy(":9222", ":9221")
 	targetID, err := NewTab("about:blank")
 	if err != nil {
 		t.Error(err)
@@ -20,15 +35,27 @@ func TestChromeDPProxy(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
+}
+func TestDoubleClose(t *testing.T) {
+	targetID, err := NewTab("about:blank")
+	if err != nil {
+		t.Error(err)
+	}
 	err = CloseTarget(targetID)
-	t.Logf("expected error: %s", err) // should error if attempting to close again
-	targetID, err = NewTab("https://github.com/jarylc/go-chromedpproxy")
+	if err != nil {
+		t.Error(err)
+	}
+	err = CloseTarget(targetID)
+	if err == nil {
+		t.Error("expected error for attempting to close again not returned")
+	}
+}
+func TestRegularChromeDPUsage(t *testing.T) {
+	targetID, err := NewTab("https://github.com/jarylc/go-chromedpproxy")
 	if err != nil {
 		t.Error(err)
 	}
 
-	// test regular chromedp usage
 	ctx := GetTarget(targetID)
 	result := ""
 	err = chromedp.Run(ctx, chromedp.Tasks{
@@ -41,7 +68,6 @@ func TestChromeDPProxy(t *testing.T) {
 		t.Errorf("expected result to be 'go-chromedpproxy', got %s", result)
 	}
 
-	// cleanup
 	err = CloseTarget(targetID)
 	if err != nil {
 		t.Error(err)

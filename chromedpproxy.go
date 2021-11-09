@@ -2,6 +2,7 @@ package chromedpproxy
 
 import (
 	"context"
+	"errors"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
@@ -10,9 +11,11 @@ import (
 )
 
 var mutex = sync.RWMutex{}
-var loaded = make(chan bool, 1)
 
-var Context context.Context
+var loaded = make(chan bool, 1)
+var mainContext context.Context
+var mainCancel chan bool
+var totalTargets = 0
 
 // PrepareProxy abstracts chromedp.NewExecAllocator to the use case of this package
 // it accepts listen addresses for both Chrome remote debugging and frontend as configuration
@@ -20,7 +23,7 @@ var Context context.Context
 func PrepareProxy(chromeListenAddr string, frontendListenAddr string, customOpts ...chromedp.ExecAllocatorOption) {
 	// ensure only exactly one context is prepared
 	mutex.Lock()
-	if Context != nil {
+	if mainContext != nil {
 		mutex.Unlock()
 		return
 	}
@@ -45,10 +48,12 @@ func PrepareProxy(chromeListenAddr string, frontendListenAddr string, customOpts
 	go func() {
 		ctx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 		defer cancel()
-		Context = ctx
+		mainContext = ctx
 		loaded <- true
 		mutex.Unlock()
-		startFrontEnd(frontendListenAddr, chromeListenAddrSplit[1])
+		mainCancel = make(chan bool, 1)
+		defer close(mainCancel)
+		startFrontEnd(frontendListenAddr, chromeListenAddrSplit[1], mainCancel)
 	}()
 }
 
@@ -56,7 +61,7 @@ func PrepareProxy(chromeListenAddr string, frontendListenAddr string, customOpts
 // it returns a target ID or error
 func NewTab(url string, customOpts ...chromedp.ContextOption) (target.ID, error) {
 	// if context is not prepared, create with default values
-	if Context == nil {
+	if mainContext == nil {
 		PrepareProxy(":9222", ":9221")
 		<-loaded
 	}
@@ -64,16 +69,17 @@ func NewTab(url string, customOpts ...chromedp.ContextOption) (target.ID, error)
 	defer mutex.Unlock()
 
 	// create new tab and navigate to URL
-	Context, _ = chromedp.NewContext(Context, customOpts...)
-	err := chromedp.Run(Context, chromedp.Tasks{
+	mainContext, _ = chromedp.NewContext(mainContext, customOpts...)
+	err := chromedp.Run(mainContext, chromedp.Tasks{
 		chromedp.Navigate(url),
 	})
 	if err != nil {
 		return "", err
 	}
+	totalTargets++
 
 	// return target ID
-	chromeContext := chromedp.FromContext(Context)
+	chromeContext := chromedp.FromContext(mainContext)
 	return chromeContext.Target.TargetID, nil
 }
 
@@ -83,20 +89,32 @@ func GetTarget(id target.ID) context.Context {
 	defer mutex.RUnlock()
 
 	// return context from target ID
-	ctx, _ := chromedp.NewContext(Context, chromedp.WithTargetID(id))
+	ctx, _ := chromedp.NewContext(mainContext, chromedp.WithTargetID(id))
 	return ctx
 }
 
 // CloseTarget closes a target by closing the page
+// if the last page has been closed, clean up everything
 // it returns an error if any
 func CloseTarget(id target.ID) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	ctx, cancel := chromedp.NewContext(Context, chromedp.WithTargetID(id))
+	if mainContext == nil {
+		return errors.New("context not prepared or already closed")
+	}
+
+	ctx, cancel := chromedp.NewContext(mainContext, chromedp.WithTargetID(id))
 	defer cancel()
 	if err := chromedp.Run(ctx, page.Close()); err != nil {
 		return err
+	}
+	totalTargets--
+	if totalTargets <= 0 {
+		loaded = make(chan bool, 1)
+		mainContext = nil
+		mainCancel <- true
+		totalTargets = 0
 	}
 	return nil
 }

@@ -246,16 +246,21 @@ const html = `<!DOCTYPE html>
 </html>`
 
 // startFrontEnd starts a blocking Fiber web server that serves the front-end alongside the websocket proxy
-func startFrontEnd(frontendListenAddr string, cdpPort string) {
+func startFrontEnd(frontendListenAddr string, cdpPort string, cancelChan chan bool) {
 	app := fiber.New(fiber.Config{
 		ReduceMemoryUsage:     true,
 		DisableStartupMessage: true,
 	})
 	interrupt := make(chan os.Signal, 1)
+	defer close(interrupt)
 	signal.Notify(interrupt, os.Interrupt)
 	go func() {
-		<-interrupt
-		_ = app.Shutdown()
+		select {
+		case <-interrupt:
+			app.Shutdown()
+		case <-cancelChan:
+			app.Shutdown()
+		}
 	}()
 	app.Get("/", func(c *fiber.Ctx) error {
 		c.Set(fiber.HeaderContentType, fiber.MIMETextHTML)
