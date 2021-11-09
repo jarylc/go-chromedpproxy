@@ -252,7 +252,6 @@ func startFrontEnd(frontendListenAddr string, cdpPort string, cancelChan chan bo
 		DisableStartupMessage: true,
 	})
 	interrupt := make(chan os.Signal, 1)
-	defer close(interrupt)
 	signal.Notify(interrupt, os.Interrupt)
 	go func() {
 		select {
