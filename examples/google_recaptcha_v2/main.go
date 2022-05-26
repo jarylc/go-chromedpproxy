@@ -27,7 +27,7 @@ func main() {
 	go func() {
 		err := chromedp.Run(ctx, chromedp.Tasks{
 			chromedp.Click(`.recaptcha-checkbox-border`, chromedp.NodeVisible),
-			chromedp.WaitVisible(`#recaptcha-verify-button`),
+			chromedp.WaitVisible(`#rc-imageselect`, chromedp.NodeVisible),
 			chromedp.ActionFunc(func(ctx context.Context) error {
 				log.Print("You would normally send this via any form of notifications to a user:")
 				log.Printf("Recaptcha detected, please solve it here: http://127.0.0.1:9221/?id=%s", targetID)

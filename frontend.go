@@ -1,11 +1,12 @@
 package chromedpproxy
 
 import (
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/websocket/v2"
+	"context"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"log"
-	"os"
-	"os/signal"
+	"net/http"
+	"time"
 )
 
 // avoid any packaging by including the front-end html as a variable
@@ -245,36 +246,41 @@ const html = `<!DOCTYPE html>
 </footer>
 </html>`
 
-// startFrontEnd starts a blocking Fiber web server that serves the front-end alongside the websocket proxy
+var timeout = time.Second * 15
+
+// startFrontEnd starts a blocking web server that serves the front-end alongside the websocket proxy
 func startFrontEnd(frontendListenAddr string, cdpPort string, cancelChan chan bool) {
-	app := fiber.New(fiber.Config{
-		ReduceMemoryUsage:     true,
-		DisableStartupMessage: true,
-	})
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
-	go func() {
-		select {
-		case <-interrupt:
-			app.Shutdown()
-		case <-cancelChan:
-			app.Shutdown()
-		}
-	}()
-	app.Get("/", func(c *fiber.Ctx) error {
-		c.Set(fiber.HeaderContentType, fiber.MIMETextHTML)
-		return c.SendString(html)
-	})
-	app.Use("/ws", func(c *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) {
-			c.Locals("allowed", true)
-			return c.Next()
-		}
-		return fiber.ErrUpgradeRequired
-	})
-	app.Get("/ws/:id", websocket.New(func(conn *websocket.Conn) {
-		proxy, err := startWebsocketProxy(cdpPort, conn)
+	r := mux.NewRouter()
+
+	srv := &http.Server{
+		Addr:         frontendListenAddr,
+		WriteTimeout: timeout,
+		ReadTimeout:  timeout,
+		IdleTimeout:  time.Second * 60,
+		Handler:      r,
+	}
+
+	r.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		_, err := writer.Write([]byte(html))
 		if err != nil {
+			log.Printf("Error writing response: %s", err)
+		}
+	})
+	r.HandleFunc("/ws/{id}", func(writer http.ResponseWriter, request *http.Request) {
+		upgrader := websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		}
+		conn, err := upgrader.Upgrade(writer, request, nil)
+		if err != nil {
+			log.Printf("Error upgrading connection: %s", err)
+			return
+		}
+
+		id := mux.Vars(request)["id"]
+		proxy, err := startWebsocketProxy(cdpPort, id, conn)
+		if err != nil {
+			log.Printf("Error starting websocket proxy: %s", err)
 			return
 		}
 		for {
@@ -288,10 +294,26 @@ func startFrontEnd(frontendListenAddr string, cdpPort string, cancelChan chan bo
 			}
 		}
 		_ = proxy.Close()
-	}))
-	err := app.Listen(frontendListenAddr)
+	})
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			if err != http.ErrServerClosed {
+				log.Printf("Error starting frontend: %s", err)
+			}
+		}
+	}()
+
+	<-cancelChan
+	stopFrontEnd(srv)
+}
+
+func stopFrontEnd(srv *http.Server) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	err := srv.Shutdown(ctx)
 	if err != nil {
-		log.Panic(err)
+		log.Printf("Error shutting down frontend: %v", err)
 		return
 	}
 }

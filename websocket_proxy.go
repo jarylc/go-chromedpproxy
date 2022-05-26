@@ -2,13 +2,12 @@ package chromedpproxy
 
 import (
 	"fmt"
-	fhwebsocket "github.com/fasthttp/websocket"
-	gfwebsocket "github.com/gofiber/websocket/v2"
+	"github.com/gorilla/websocket"
 )
 
 // startWebsocketProxy proxies all messages between Chrome remote debugger websocket to and from requester
-func startWebsocketProxy(cdpPort string, requester *gfwebsocket.Conn) (*fhwebsocket.Conn, error) {
-	conn, _, err := fhwebsocket.DefaultDialer.Dial(fmt.Sprintf("ws://127.0.0.1:%s/devtools/page/%s", cdpPort, requester.Params("id")), nil)
+func startWebsocketProxy(cdpPort string, id string, requester *websocket.Conn) (*websocket.Conn, error) {
+	conn, _, err := websocket.DefaultDialer.Dial(fmt.Sprintf("ws://127.0.0.1:%s/devtools/page/%s", cdpPort, id), nil)
 	if err != nil {
 		return nil, err
 	}

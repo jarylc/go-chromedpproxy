@@ -27,8 +27,7 @@ func main() {
 	// grab hcaptcha iframe
 	var iframes []*cdp.Node
 	err = chromedp.Run(ctx, chromedp.Tasks{
-		chromedp.SetValue(`#name-2`, "John Doe", chromedp.NodeVisible),
-		chromedp.Click(`#radio-4`, chromedp.NodeVisible),
+		chromedp.Click(`#radio-5`, chromedp.NodeVisible),
 		chromedp.Nodes(`.h-captcha > iframe`, &iframes),
 	})
 	if err != nil && !errors.Is(err, context.Canceled) {

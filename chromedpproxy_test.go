@@ -38,6 +38,7 @@ func TestClosingTwoTabsAndCreateOneTab(t *testing.T) {
 }
 func TestDoubleClose(t *testing.T) {
 	targetID, err := NewTab("about:blank")
+
 	if err != nil {
 		t.Error(err)
 	}
