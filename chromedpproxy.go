@@ -3,6 +3,7 @@ package chromedpproxy
 import (
 	"context"
 	"errors"
+	chromedpundetected "github.com/Davincible/chromedp-undetected"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
@@ -35,18 +36,20 @@ func PrepareProxy(chromeListenAddr string, frontendListenAddr string, customOpts
 	}
 
 	// insert remote-debugging flags and any additional options
-	opts := append(
-		chromedp.DefaultExecAllocatorOptions[:],
+	opts := []chromedp.ExecAllocatorOption{
 		chromedp.Flag("remote-debugging-address", chromeListenAddrSplit[0]),
 		chromedp.Flag("remote-debugging-port", chromeListenAddrSplit[1]),
-	)
+	}
 	if len(customOpts) > 0 {
 		opts = append(opts, customOpts...)
 	}
 
 	// create context and keep alive
 	go func() {
-		ctx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+		ctx, cancel, _ := chromedpundetected.New(chromedpundetected.NewConfig(
+			chromedpundetected.WithChromeFlags(opts...),
+			chromedpundetected.WithHeadless(),
+		))
 		defer cancel()
 		mainContext = ctx
 		loaded <- true
@@ -68,9 +71,15 @@ func NewTab(url string, customOpts ...chromedp.ContextOption) (target.ID, error)
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	// create new tab and navigate to URL
 	mainContext, _ = chromedp.NewContext(mainContext, customOpts...)
 	err := chromedp.Run(mainContext, chromedp.Tasks{
+		chromedp.Navigate(url),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	err = chromedp.Run(mainContext, chromedp.Tasks{
 		chromedp.Navigate(url),
 	})
 	if err != nil {

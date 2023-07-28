@@ -5,12 +5,15 @@ Inspired by [claabs/puppeteer-extra-plugin-portal](https://github.com/claabs/pup
 
 A Go module for a ChromeDP abstraction layer that additionally hosts a webserver to remotely view ChromeDP sessions. Essentially opening a "portal" to the page. Perfect for Go automations that require manual intervention.
 
+IMPORTANT: You must install `xvfb` on the system / docker container
+
 [Report Bugs](https://github.com/jarylc/go-chromedpproxy/issues/new) · [Request Features](https://github.com/jarylc/go-chromedpproxy/issues/new)
 
 ## About The Project
 ### Built With
 * [golang](https://golang.org/)
 * [chromedp/chromedp](https://github.com/chromedp/chromedp)
+* [Davincible/chromedp-undetected](https://github.com/Davincible/chromedp-undetected)
 * [gofiber/fiber](https://github.com/gofiber/fiber)
     * [gofiber/websocket](https://github.com/gofiber/websocket)
       * [fasthttp/websocket](https://github.com/fasthttp/websocket)
@@ -18,6 +21,7 @@ A Go module for a ChromeDP abstraction layer that additionally hosts a webserver
 Please proceed to the [examples directory](examples)
 - [Google Recaptcha v2](examples/google_recaptcha_v2)
 - [hcaptcha](examples/hcaptcha)
+- [nowsecure.nl](examples/nowsecure)
 
 ## Getting Started
 ### Installing
