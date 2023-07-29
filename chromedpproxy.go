@@ -114,12 +114,11 @@ func CloseTarget(id target.ID) error {
 	}
 
 	ctx, cancel := chromedp.NewContext(mainContext, chromedp.WithTargetID(id))
-	defer cancel()
-	if err := chromedp.Run(ctx, page.Close()); err != nil {
-		return err
-	}
-	totalTargets--
-	if totalTargets <= 0 {
+	_ = chromedp.Run(ctx, page.Close())
+	_ = target.CloseTarget(id).Do(mainContext)
+	cancel()
+	targets, err := chromedp.Targets(mainContext)
+	if err != nil || len(targets) <= 0 {
 		loaded = make(chan bool, 1)
 		mainContext = nil
 		mainCancel <- true

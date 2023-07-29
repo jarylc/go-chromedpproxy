@@ -17,6 +17,7 @@ func main() {
 	if err != nil && !errors.Is(err, context.Canceled) {
 		log.Panic(err)
 	}
+	defer chromedpproxy.CloseTarget(targetID)
 	ctx := chromedpproxy.GetTarget(targetID)
 	if err := chromedp.Run(ctx,
 		// Check if we pass anti-bot measures.
